@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Broadway Lottery Command Center</title>
+    <style>
+        :root {
+            --bg-color: #121212;
+            --card-bg: #1e1e1e;
+            --text-primary: #e0e0e0;
+            --text-secondary: #a0a0a0;
+            --accent: #d4af37; /* Broadway Gold */
+            --success: #4caf50;
+            --danger: #f44336;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-primary);
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+        }
+
+        h1 {
+            color: var(--accent);
+            margin-bottom: 10px;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            text-align: center;
+        }
+
+        p.subtitle {
+            color: var(--text-secondary);
+            margin-bottom: 30px;
+            max-width: 600px;
+            text-align: center;
+        }
+
+        .dashboard-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            width: 100%;
+            max-width: 1000px;
+        }
+
+        .card {
+            background-color: var(--card-bg);
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+            border: 1px solid #333;
+            transition: transform 0.2s, border-color 0.2s;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+        }
+
+        .card:hover {
+            transform: translateY(-5px);
+            border-color: var(--accent);
+        }
+
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+
+        .card-title {
+            font-size: 1.2rem;
+            font-weight: bold;
+            color: white;
+        }
+
+        .status-badge {
+            font-size: 0.8rem;
+            padding: 4px 8px;
+            border-radius: 4px;
+            background-color: #333;
+            color: var(--text-secondary);
+        }
+
+        .status-badge.entered {
+            background-color: var(--success);
+            color: white;
+        }
+
+        .card-desc {
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+            margin-bottom: 20px;
+            line-height: 1.5;
+        }
+
+        .actions {
+            display: flex;
+            gap: 10px;
+            margin-top: auto;
+        }
+
+        .btn {
+            flex: 1;
+            padding: 10px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 600;
+            text-decoration: none;
+            text-align: center;
+            transition: opacity 0.2s;
+        }
+
+        .btn:hover {
+            opacity: 0.9;
+        }
+
+        .btn-primary {
+            background-color: var(--accent);
+            color: black;
+        }
+
+        .btn-check {
+            background-color: #333;
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            max-width: 50px;
+        }
+
+        .btn-check.active {
+            background-color: var(--success);
+        }
+
+        .reset-btn {
+            margin-top: 40px;
+            background: transparent;
+            border: 1px solid #333;
+            color: var(--text-secondary);
+            padding: 8px 16px;
+            border-radius: 20px;
+            cursor: pointer;
+        }
+
+        .reset-btn:hover {
+            border-color: var(--danger);
+            color: var(--danger);
+        }
+
+        /* Utility for the 'entered' state visually */
+        .card.entered-state {
+            opacity: 0.6;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>Broadway Lottery Hub</h1>
+    <p class="subtitle">Centralized dashboard for NYC rush tickets and lotteries. Click the links to enter, then mark them as done for the day.</p>
+
+    <div class="dashboard-grid" id="grid">
+        <!-- Cards injected by JS -->
+    </div>
+
+    <button class="reset-btn" onclick="resetAll()">Reset All Progress</button>
+
+    <script>
+        // Configuration for the lottery sites
+        const sites = [
+            {
+                id: 'telecharge',
+                name: 'Telecharge Rush',
+                url: 'https://rush.telecharge.com/',
+                description: 'Offers digital rush and lottery tickets for many major Broadway and Off-Broadway shows.'
+            },
+            {
+                id: 'broadwaydirect',
+                name: 'Broadway Direct',
+                url: 'https://lottery.broadwaydirect.com/',
+                description: 'The official lottery source for many hit shows (e.g., Hamilton, Lion King, Aladdin).'
+            },
+            {
+                id: 'todaytix',
+                name: 'TodayTix',
+                url: 'https://www.todaytix.com/nyc/category/rush-tickets',
+                description: 'Mobile-first platform for Rush and Lottery tickets. Requires the app for some entries.'
+            },
+            {
+                id: 'luckyseat',
+                name: 'Lucky Seat',
+                url: 'https://www.luckyseat.com/',
+                description: 'Handles lotteries for shows like Moulin Rouge! and The Book of Mormon.'
+            }
+        ];
+
+        // Helper to get today's date string (YYYY-MM-DD) for storage keys
+        const getTodayStr = () => new Date().toISOString().split('T')[0];
+
+        // Initialize state
+        function render() {
+            const grid = document.getElementById('grid');
+            grid.innerHTML = '';
+            const today = getTodayStr();
+
+            sites.forEach(site => {
+                // Check local storage for entry status
+                const storageKey = `lottery_${site.id}_${today}`;
+                const isEntered = localStorage.getItem(storageKey) === 'true';
+
+                const card = document.createElement('div');
+                card.className = `card ${isEntered ? 'entered-state' : ''}`;
+                
+                card.innerHTML = `
+                    <div class="card-header">
+                        <span class="card-title">${site.name}</span>
+                        <span class="status-badge ${isEntered ? 'entered' : ''}">
+                            ${isEntered ? 'ENTERED' : 'PENDING'}
+                        </span>
+                    </div>
+                    <div class="card-desc">${site.description}</div>
+                    <div class="actions">
+                        <a href="${site.url}" target="_blank" class="btn btn-primary" onclick="markAsVisited('${site.id}')">
+                            Open Site
+                        </a>
+                        <button class="btn btn-check ${isEntered ? 'active' : ''}" onclick="toggleStatus('${site.id}')" title="Mark as entered">
+                            ${isEntered ? '✓' : '○'}
+                        </button>
+                    </div>
+                `;
+                grid.appendChild(card);
+            });
+        }
+
+        // Mark as entered in LocalStorage
+        function toggleStatus(siteId) {
+            const today = getTodayStr();
+            const key = `lottery_${siteId}_${today}`;
+            const current = localStorage.getItem(key) === 'true';
+            
+            if (current) {
+                localStorage.removeItem(key);
+            } else {
+                localStorage.setItem(key, 'true');
+            }
+            render();
+        }
+
+        // Optional: Automatically mark as visited when they click the link? 
+        // Currently disabled to force manual check (better accuracy if they didn't actually finish).
+        function markAsVisited(siteId) {
+            // Uncomment the line below if you want auto-check on click
+            // localStorage.setItem(`lottery_${siteId}_${getTodayStr()}`, 'true');
+            // setTimeout(render, 500);
+        }
+
+        function resetAll() {
+            const today = getTodayStr();
+            sites.forEach(site => {
+                localStorage.removeItem(`lottery_${site.id}_${today}`);
+            });
+            render();
+        }
+
+        // Initial Render
+        render();
+
+        // Check if day changed while page was open
+        setInterval(() => {
+            // Simple check could go here to refresh if date changed
+        }, 60000);
+
+    </script>
+</body>
+</html>
